@@ -1,0 +1,5 @@
+$CUR_DIR/testbench.sv
+$CUR_DIR/bsg_fifo_1r1w_rolly.sv
+$BASEJUMP_STL_DIR/bsg_mem/bsg_mem_1r1w.v
+$BASEJUMP_STL_DIR/bsg_mem/bsg_mem_1r1w_synth.v
+$BASEJUMP_STL_DIR/bsg_misc/bsg_circular_ptr.v

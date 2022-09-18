@@ -13,6 +13,8 @@ program testbench  #(parameter `BSG_INV_PARAM(width_p)
    , output logic               clr_v_o
    , output logic               deq_v_o
    , output logic               roll_v_o
+   , output logic               commit_not_drop_v_o
+   , output logic               commit_not_drop_o
 
    , output logic [width_p-1:0] data_o
    , output logic               v_o
@@ -25,38 +27,30 @@ program testbench  #(parameter `BSG_INV_PARAM(width_p)
 
 initial begin
     reset_o = 1'b1;
+
     clr_v_o = 1'b0;
     deq_v_o = 1'b0;
     roll_v_o = 1'b0;
+    commit_not_drop_v_o = 1'b0;
+
     v_o = 1'b0;
-    ready_o = 1'b1;
-    @(posedge clk_i);
-    reset_o = 1'b0;
-    data_o = 8'haa;
-    v_o = 1'b1;
-    @(posedge clk_i);
-    @(posedge clk_i);
-    @(posedge clk_i);
-    v_o = 1'b0;
-    @(posedge clk_i);
-    @(posedge clk_i);
-    @(posedge clk_i);
-    @(posedge clk_i);
-    roll_v_o = 1'b1;
-    @(posedge clk_i);
-    roll_v_o = 1'b0;
-    @(posedge clk_i);
-    @(posedge clk_i);
     ready_o = 1'b0;
     @(posedge clk_i);
+    reset_o = 1'b0;
+    v_o = 1'b1;
+    data_o = 8'haa;
+    @(posedge clk_i);
+    data_o = 8'hbb;
+    commit_not_drop_v_o = 1'b1;
+    commit_not_drop_o = 1'b1;
+    @(posedge clk_i);
+    v_o = 1'b0;
+    commit_not_drop_v_o = 1'b0;
     @(posedge clk_i);
     @(posedge clk_i);
-    clr_v_o = 1'b1;
-    @(posedge clk_i);
-    clr_v_o = 1'b0;
     @(posedge clk_i);
     @(posedge clk_i);
-    @(posedge clk_i);
+
 
 end
 
@@ -74,6 +68,8 @@ logic               reset_lo;
 logic               clr_v_lo;
 logic               deq_v_lo;
 logic               roll_v_lo;
+logic               commit_not_drop_v_lo;
+logic               commit_not_drop_lo;
 
 logic [width_p-1:0] data_lo;
 logic               v_lo;
@@ -103,6 +99,8 @@ testbench #(
     ,.clr_v_o(clr_v_lo)
     ,.deq_v_o(deq_v_lo)
     ,.roll_v_o(roll_v_lo)
+    ,.commit_not_drop_v_o(commit_not_drop_v_lo)
+    ,.commit_not_drop_o(commit_not_drop_lo)
 
     ,.data_o(data_lo)
     ,.v_o(v_lo)
@@ -125,6 +123,8 @@ bsg_fifo_1r1w_rolly #(
     ,.clr_v_i(clr_v_lo)
     ,.deq_v_i(deq_v_lo)
     ,.roll_v_i(roll_v_lo)
+    ,.commit_not_drop_v_i(commit_not_drop_v_lo)
+    ,.commit_not_drop_i(commit_not_drop_lo)
 
     ,.data_i(data_lo)
     ,.v_i(v_lo)

@@ -26,4 +26,4 @@ flist.vcs: flist.template
 	cat $^ | envsubst > $@
 
 clean:
-	rm -rf simv.daidir/ simv csrc/ flist.vcs ucli.key vc_hdrs.h
+	rm -rf simv.daidir/ simv csrc/ flist.vcs dump.vpd ucli.key vc_hdrs.h DVEfiles/

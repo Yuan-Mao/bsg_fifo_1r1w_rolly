@@ -170,7 +170,7 @@ module wrapper();
 parameter width_p = 8;
 parameter els_p = 4;
 parameter harden_p = 1;
-parameter write_no_backpressure_p = 1;
+parameter write_no_backpressure_p = 0;
 
 bit                 clk_i;
 logic               reset_lo;

@@ -12,11 +12,12 @@ module bsg_fifo_1r1w_rolly
    , input                reset_i
 
    // read side
-   , input                clr_v_i
    , input                deq_v_i
    , input                rollback_v_i
+   , input                ack_v_i
 
    // write side
+   , input                clr_v_i
    , input                commit_not_drop_v_i
    , input                commit_not_drop_i
 
@@ -35,8 +36,8 @@ module bsg_fifo_1r1w_rolly
   logic [ptr_width_lp:0] wptr_r, wcptr_r;
   logic [ptr_width_lp:0] rptr_n;
 
-  // Used to catch up on rollback, clear, commit and drop
-  logic [ptr_width_lp:0] rptr_jmp, wptr_jmp, wcptr_jmp;
+  // Used to catch up on various read/write operations
+  logic [ptr_width_lp:0] rptr_jmp, rcptr_jmp, wptr_jmp, wcptr_jmp;
 
   // Status
   logic empty, full;
@@ -49,27 +50,29 @@ module bsg_fifo_1r1w_rolly
   //   commit: Forward wcptr to wptr
   //   drop: Reset wptr to wcptr
 
-  wire enq  = ready_THEN_valid_p ? v_i : ready_o & v_i;
-  wire deq  = deq_v_i & ~empty;
-  wire read = yumi_i;
-  wire clr  = clr_v_i;
+  wire enq      = ready_THEN_valid_p ? v_i : ready_o & v_i;
+  wire deq      = deq_v_i & ~empty;
+  wire read     = yumi_i;
   wire rollback = rollback_v_i;
-  wire commit = commit_not_drop_v_i & commit_not_drop_i;
-  wire drop   = commit_not_drop_v_i & ~commit_not_drop_i;
+  wire ack      = ack_v_i;
+  wire clr      = clr_v_i;
+  wire commit   = commit_not_drop_v_i & commit_not_drop_i;
+  wire drop     = commit_not_drop_v_i & ~commit_not_drop_i;
 
   assign rptr_jmp = rollback
                     ? (rcptr_r - rptr_r + (ptr_width_lp+1)'(deq))
-                    : read
-                       ? ((ptr_width_lp+1)'(1))
-                       : ((ptr_width_lp+1)'(0));
+                    : ((ptr_width_lp+1)'(read));
 
   assign wptr_jmp = clr
                     ? (rptr_r - wptr_r + (ptr_width_lp+1)'(read))
                     : drop
                        ? (wcptr_r - wptr_r)
-                       : enq
-                          ? ((ptr_width_lp+1)'(1))
-                          : ((ptr_width_lp+1)'(0));
+                       : ((ptr_width_lp+1)'(enq));
+
+  assign rcptr_jmp = ack
+                    ? (rptr_r - rcptr_r)
+                    : ((ptr_width_lp+1)'(deq));
+
   assign wcptr_jmp = clr
                     ? (rptr_r - wcptr_r + (ptr_width_lp+1)'(read))
                     : commit
@@ -96,11 +99,11 @@ module bsg_fifo_1r1w_rolly
      );
 
   bsg_circular_ptr
-   #(.slots_p(2*els_p), .max_add_p(1))
+   #(.slots_p(2*els_p), .max_add_p(2*els_p-1))
    rcptr
     (.clk(clk_i)
      ,.reset_i(reset_i)
-     ,.add_i(deq)
+     ,.add_i(rcptr_jmp)
     ,.o(rcptr_r)
     ,.n_o()
      );
@@ -174,9 +177,11 @@ end else begin
 end
   // synopsys translate_off
   assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(deq_v_i & empty)))
-    else begin $error("%m error: deque empty fifo at time %t", $time);
-      $finish;
-    end
+    else $error("%m error: deque empty fifo at time %t", $time);
+
+  assert property (@(posedge clk_i) (reset_i != 1'b0 ||
+        ($countones({deq_v_i, rollback_v_i, ack_v_i}) <= 1)))
+    else $error("%m error: request more than one read operations at time %t", $time);
   // synopsys translate_on
 
 endmodule

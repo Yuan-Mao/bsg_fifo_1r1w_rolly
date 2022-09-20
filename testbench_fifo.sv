@@ -10,9 +10,11 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
      input                      clk_i
    , output logic               reset_o
 
-   , output logic               clr_v_o
    , output logic               deq_v_o
    , output logic               rollback_v_o
+   , output logic               ack_v_o
+
+   , output logic               clr_v_o
    , output logic               commit_not_drop_v_o
    , output logic               commit_not_drop_o
 
@@ -28,9 +30,10 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
 initial begin
     reset_o = 1'b1;
 
-    clr_v_o = 1'b0;
     deq_v_o = 1'b0;
     rollback_v_o = 1'b0;
+    ack_v_o = 1'b0;
+    clr_v_o = 1'b0;
     commit_not_drop_v_o = 1'b0;
 
     v_o = 1'b0;
@@ -58,6 +61,11 @@ initial begin
     @(posedge clk_i);
     @(posedge clk_i);
     @(posedge clk_i);
+    ack_v_o = 1'b1;
+    deq_v_o = 1'b1;
+    @(posedge clk_i);
+    ack_v_o = 1'b0;
+    @(posedge clk_i);
 end
 
 endprogram
@@ -72,9 +80,11 @@ parameter harden_p = 1;
 bit                 clk_i;
 logic               reset_lo;
 
-logic               clr_v_lo;
 logic               deq_v_lo;
 logic               rollback_v_lo;
+logic               ack_v_lo;
+
+logic               clr_v_lo;
 logic               commit_not_drop_v_lo;
 logic               commit_not_drop_lo;
 
@@ -103,9 +113,11 @@ testbench #(
      .clk_i(clk_i)
     ,.reset_o(reset_lo)
 
-    ,.clr_v_o(clr_v_lo)
     ,.deq_v_o(deq_v_lo)
     ,.rollback_v_o(rollback_v_lo)
+    ,.ack_v_o(ack_v_lo)
+
+    ,.clr_v_o(clr_v_lo)
     ,.commit_not_drop_v_o(commit_not_drop_v_lo)
     ,.commit_not_drop_o(commit_not_drop_lo)
 
@@ -128,9 +140,11 @@ bsg_fifo_1r1w_rolly #(
      .clk_i(clk_i)
     ,.reset_i(reset_lo)
 
-    ,.clr_v_i(clr_v_lo)
     ,.deq_v_i(deq_v_lo)
     ,.rollback_v_i(rollback_v_lo)
+    ,.ack_v_i(ack_v_lo)
+
+    ,.clr_v_i(clr_v_lo)
     ,.commit_not_drop_v_i(commit_not_drop_v_lo)
     ,.commit_not_drop_i(commit_not_drop_lo)
 

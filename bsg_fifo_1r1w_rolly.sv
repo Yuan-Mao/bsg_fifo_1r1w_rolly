@@ -1,6 +1,45 @@
 
 `include "bsg_defines.v"
 
+  // Operations
+  //   deq_v_i: Increment rcptr by 1
+  //   rollback_v_i: Reset rptr to rcptr
+  //   ack_v_i: Forward rcptr to rptr
+  //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
+  // between rptr and wptr
+  //   commit: Forward wcptr to wptr
+  //   drop: Reset wptr to wcptr
+
+  /* Operation Table */
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //          //          //          //          //          //          //          //          //
+  // from\to  //  wptr    //  wptr+1  //  rptr    //  rptr+1  //  wcptr   //  rcptr   //  rcptr+1 //
+  //          //          //          //          //          //          //          //          //
+  //          //          //          //          //          //          //          //          //
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //          //          //          //          //          //          //          //          //
+  //  wptr    //    -     //    -     //  clr     //  clr     //  drop    //    -     //    -     //
+  //          //          //          //  (~read) //  (read)  //          //          //          //
+  //          //          //          //          //          //          //          //          //
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //          //          //          //          //          //          //          //          //
+  //  rptr    //    -     //    -     //    -     //    -     //    -     // rollback // rollback //
+  //          //          //          //          //          //          //  (~deq)  //  (deq)   //
+  //          //          //          //          //          //          //          //          //
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //          //          //          //          //          //          //          //          //
+  //  wcptr   //  commit  //  commit  //  clr     //  clr     //    -     //    -     //    -     //
+  //          //  (~enq)  //  (enq)   //  (~read) //  (read)  //          //          //          //
+  //          //          //          //          //          //          //          //          //
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  //          //          //          //          //          //          //          //          //
+  //  rcptr   //    -     //    -     //   ack    //    -     //    -     //    -     //    -     //
+  //          //          //          //          //          //          //          //          //
+  //          //          //          //          //          //          //          //          //
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 module bsg_fifo_1r1w_rolly
   #(parameter `BSG_INV_PARAM(width_p)
     , parameter `BSG_INV_PARAM(els_p)
@@ -41,14 +80,6 @@ module bsg_fifo_1r1w_rolly
 
   // Status
   logic empty, full;
-
-  // Operations
-  //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
-  // between rptr and wptr
-  //   deq_v_i: Increment rcptr by 1
-  //   rollback_v_i: Reset rptr to rcptr
-  //   commit: Forward wcptr to wptr
-  //   drop: Reset wptr to wcptr
 
   wire enq      = ready_THEN_valid_p ? v_i : ready_o & v_i;
   wire deq      = deq_v_i & ~empty;

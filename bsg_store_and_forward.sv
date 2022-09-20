@@ -88,38 +88,29 @@ module bsg_store_and_forward
      ,.yumi_i(fifo_yumi_li)
   );
 
-  enum logic [1:0] {e_ready, e_receiving, e_dropping} state_r, state_n;
+  logic dropping_state_r, dropping_state_n;
 
   bsg_dff_reset #(
       .width_p(2)
   ) state_reg (
       .clk_i(clk_i)
      ,.reset_i(reset_i)
-     ,.data_i(state_n)
-     ,.data_o(state_r)
+     ,.data_i(dropping_state_n)
+     ,.data_o(dropping_state_r)
   );
 
-  // TODO: Reduce from 3 to 2 states
   always_comb begin
-    state_n = state_r;
-    case (state_r)
-      e_ready: begin
+    dropping_state_n = dropping_state_r;
+    case (dropping_state_r)
+      1'b0: begin
         if (enq && !last) begin
-          if (overflow || (full && write_no_backpressure_p))
-            state_n = e_dropping;
-          else
-            state_n = e_receiving;
+          if (full && write_no_backpressure_p)
+            dropping_state_n = 1'b1;
         end
       end
-      e_receiving: begin
+      1'b1: begin
         if (enq && last)
-          state_n = e_ready;
-        else if ((enq && (full && write_no_backpressure_p)) || overflow)
-          state_n = e_dropping;
-      end
-      e_dropping: begin
-        if (enq && last)
-          state_n = e_ready;
+          dropping_state_n = 1'b0;
       end
     endcase
   end
@@ -127,7 +118,7 @@ module bsg_store_and_forward
   always_comb begin
     fifo_v_li = 1'b0;
     if (enq) begin
-      if ((full && write_no_backpressure_p) || overflow || state_r == e_dropping) begin
+      if ((full && write_no_backpressure_p) || overflow || dropping_state_r) begin
       end else begin
         fifo_v_li = 1'b1;
       end
@@ -136,7 +127,7 @@ module bsg_store_and_forward
 
 
   // ready_o will be high until finishing dropping a packet
-  assign ready_o = write_no_backpressure_p || (state_r == e_dropping) || overflow || !full;
+  assign ready_o = write_no_backpressure_p || dropping_state_r || overflow || !full;
   assign v_o     = fifo_v_lo;
   assign {data_o, last_o}  = fifo_data_lo;
 
@@ -152,7 +143,7 @@ module bsg_store_and_forward
   always_comb begin
     {good_packet_n, incomplete_packet_n, bad_packet_n} = 3'b0;
     if (enq && last) begin
-      if ((full && write_no_backpressure_p) || overflow || state_r == e_dropping) begin
+      if ((full && write_no_backpressure_p) || overflow || dropping_state_r) begin
         incomplete_packet_n = 1'b1;
       end else begin
         // complete packet

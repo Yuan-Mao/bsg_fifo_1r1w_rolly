@@ -37,7 +37,25 @@ initial begin
     ready_o = 1'b0;
     @(posedge clk_i);
     reset_o = 1'b0;
-    deq_v_o = 1'b1;
+    v_o = 1'b1;
+    data_o = 8'haa;
+    @(posedge clk_i);
+    data_o = 8'hbb;
+    @(posedge clk_i);
+    data_o = 8'hcc;
+    @(posedge clk_i);
+    data_o = 8'hdd;
+    commit_not_drop_v_o = 1'b1;
+    commit_not_drop_o = 1'b1;
+    @(posedge clk_i);
+    commit_not_drop_v_o = 1'b0;
+    commit_not_drop_o = 1'b0;
+    @(posedge clk_i);
+    @(posedge clk_i);
+    ready_o = 1'b1;
+    @(posedge clk_i);
+    @(posedge clk_i);
+    @(posedge clk_i);
     @(posedge clk_i);
     @(posedge clk_i);
 end
@@ -49,6 +67,7 @@ module wrapper();
 
 parameter width_p = 8;
 parameter els_p = 4;
+parameter harden_p = 1;
 
 bit                 clk_i;
 logic               reset_lo;
@@ -104,6 +123,7 @@ assign yumi_lo = v_li & ready_lo;
 bsg_fifo_1r1w_rolly #(
      .width_p(width_p)
     ,.els_p(els_p)
+    ,.harden_p(harden_p)
 ) dut (
      .clk_i(clk_i)
     ,.reset_i(reset_lo)

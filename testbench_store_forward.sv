@@ -169,7 +169,8 @@ module wrapper();
 // change parameters here:
 parameter width_p = 8;
 parameter els_p = 4;
-parameter write_no_backpressure_p = 0;
+parameter harden_p = 1;
+parameter write_no_backpressure_p = 1;
 
 bit                 clk_i;
 logic               reset_lo;
@@ -228,6 +229,7 @@ bsg_store_and_forward #(
      .width_p(width_p)
     ,.els_p(els_p)
     ,.write_no_backpressure_p(write_no_backpressure_p)
+    ,.harden_p(harden_p)
 ) dut (
      .clk_i(clk_i)
     ,.reset_i(reset_lo)

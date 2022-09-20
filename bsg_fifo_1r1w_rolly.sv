@@ -5,7 +5,7 @@ module bsg_fifo_1r1w_rolly
   #(parameter `BSG_INV_PARAM(width_p)
     , parameter `BSG_INV_PARAM(els_p)
     , parameter ready_THEN_valid_p = 0
-
+    , parameter harden_p = 0
     , localparam ptr_width_lp = `BSG_SAFE_CLOG2(els_p)
     )
   (input                  clk_i
@@ -33,6 +33,7 @@ module bsg_fifo_1r1w_rolly
   // ptr_width + 1 for wrap bit
   logic [ptr_width_lp:0] rptr_r, rcptr_r;
   logic [ptr_width_lp:0] wptr_r, wcptr_r;
+  logic [ptr_width_lp:0] rptr_n;
 
   // Used to catch up on rollback, clear, commit and drop
   logic [ptr_width_lp:0] rptr_jmp, wptr_jmp, wcptr_jmp;
@@ -121,9 +122,9 @@ module bsg_fifo_1r1w_rolly
     ,.reset_i(reset_i)
     ,.add_i(rptr_jmp)
     ,.o(rptr_r)
-    ,.n_o()
+    ,.n_o(rptr_n)
     );
-
+if (harden_p == 0) begin
   bsg_mem_1r1w
   #(.width_p(width_p), .els_p(els_p))
   fifo_mem
@@ -136,6 +137,41 @@ module bsg_fifo_1r1w_rolly
     ,.r_addr_i(rptr_r[0+:ptr_width_lp])
     ,.r_data_o(data_o)
     );
+end else begin
+  logic [width_p-1:0] data_o_mem, data_o_reg;
+  logic read_write_same_addr_r, read_write_same_addr_n;
+
+  bsg_mem_1r1w_sync
+  #(.width_p(width_p)
+    ,.els_p(els_p)
+    ,.read_write_same_addr_p(0)
+    ,.disable_collision_warning_p(0)
+    ,.harden_p(1))
+  fifo_mem
+   (.clk_i(clk_i)
+    ,.reset_i(reset_i)
+    ,.w_v_i(enq)
+    ,.w_addr_i(wptr_r[0+:ptr_width_lp])
+    ,.w_data_i(data_i)
+    ,.r_v_i(~read_write_same_addr_n)
+    ,.r_addr_i(rptr_n[0+:ptr_width_lp])
+    ,.r_data_o(data_o_mem)
+    );
+
+  bsg_dff_en
+  #(.width_p(width_p))
+  bypass_reg
+   (.clk_i(clk_i)
+    ,.data_i(data_i)
+    ,.en_i  (read_write_same_addr_n)
+    ,.data_o(data_o_reg)
+    );
+
+  assign read_write_same_addr_n = enq & (wptr_r[0+:ptr_width_lp] == rptr_n[0+:ptr_width_lp]);
+  always_ff @(posedge clk_i)
+    read_write_same_addr_r <= read_write_same_addr_n;
+  assign data_o = (read_write_same_addr_r) ? data_o_reg : data_o_mem;
+end
   // synopsys translate_off
   assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(deq_v_i & empty)))
     else begin $error("%m error: deque empty fifo at time %t", $time);

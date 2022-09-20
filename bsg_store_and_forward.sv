@@ -8,6 +8,7 @@ module bsg_store_and_forward
     // If 1, the upstream master is unable to accept
     // back-pressure, and ready_o will always be high.
     , parameter `BSG_INV_PARAM(write_no_backpressure_p)
+    , parameter harden_p = 0
     , parameter ready_THEN_valid_p = 0
 
     , localparam ptr_width_lp = `BSG_SAFE_CLOG2(els_p)
@@ -67,6 +68,7 @@ module bsg_store_and_forward
   bsg_fifo_1r1w_rolly #(
       .width_p(width_p+1)
      ,.els_p(els_p)
+     ,.harden_p(harden_p)
      ,.ready_THEN_valid_p(ready_THEN_valid_p)
   ) fifo (
       .clk_i(clk_i)

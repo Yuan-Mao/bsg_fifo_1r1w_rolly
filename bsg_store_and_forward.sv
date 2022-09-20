@@ -74,7 +74,7 @@ module bsg_store_and_forward
 
      ,.clr_v_i(1'b0)
      ,.deq_v_i(fifo_yumi_li)
-     ,.roll_v_i(1'b0)
+     ,.rollback_v_i(1'b0)
  
      ,.commit_not_drop_v_i(commit_not_drop_v_li)
      ,.commit_not_drop_i(commit_not_drop_li)

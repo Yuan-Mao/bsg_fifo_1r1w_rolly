@@ -14,7 +14,7 @@ module bsg_fifo_1r1w_rolly
    // read side
    , input                clr_v_i
    , input                deq_v_i
-   , input                roll_v_i
+   , input                rollback_v_i
 
    // write side
    , input                commit_not_drop_v_i
@@ -34,19 +34,29 @@ module bsg_fifo_1r1w_rolly
   logic [ptr_width_lp:0] rptr_r, rcptr_r;
   logic [ptr_width_lp:0] wptr_r, wcptr_r;
 
-  // Used to catch up on roll, clear, commit and drop
+  // Used to catch up on rollback, clear, commit and drop
   logic [ptr_width_lp:0] rptr_jmp, wptr_jmp, wcptr_jmp;
 
+  // Status
+  logic empty, full;
+
   // Operations
+  //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
+  // between rptr and wptr
+  //   deq_v_i: Increment rcptr by 1
+  //   rollback_v_i: Reset rptr to rcptr
+  //   commit: Forward wcptr to wptr
+  //   drop: Reset wptr to wcptr
+
   wire enq  = ready_THEN_valid_p ? v_i : ready_o & v_i;
-  wire deq  = deq_v_i;
+  wire deq  = deq_v_i & ~empty;
   wire read = yumi_i;
   wire clr  = clr_v_i;
-  wire roll = roll_v_i;
+  wire rollback = rollback_v_i;
   wire commit = commit_not_drop_v_i & commit_not_drop_i;
   wire drop   = commit_not_drop_v_i & ~commit_not_drop_i;
 
-  assign rptr_jmp = roll
+  assign rptr_jmp = rollback
                     ? (rcptr_r - rptr_r + (ptr_width_lp+1)'(deq))
                     : read
                        ? ((ptr_width_lp+1)'(1))
@@ -66,13 +76,13 @@ module bsg_fifo_1r1w_rolly
                        : ((ptr_width_lp+1)'(0));
 
 
-  wire empty = (rptr_r[0+:ptr_width_lp] == wcptr_r[0+:ptr_width_lp])
+  assign empty = (rptr_r[0+:ptr_width_lp] == wcptr_r[0+:ptr_width_lp])
                & (rptr_r[ptr_width_lp] == wcptr_r[ptr_width_lp]);
-  wire full = (rcptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
+  assign full = (rcptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
               & (rcptr_r[ptr_width_lp] != wptr_r[ptr_width_lp]);
 
   assign ready_o = ~clr & ~full;
-  assign v_o     = ~roll & ~empty;
+  assign v_o     = ~rollback & ~empty;
 
   bsg_circular_ptr
    #(.slots_p(2*els_p), .max_add_p(2*els_p-1))
@@ -89,7 +99,7 @@ module bsg_fifo_1r1w_rolly
    rcptr
     (.clk(clk_i)
      ,.reset_i(reset_i)
-     ,.add_i(deq_v_i)
+     ,.add_i(deq)
     ,.o(rcptr_r)
     ,.n_o()
      );
@@ -126,8 +136,12 @@ module bsg_fifo_1r1w_rolly
     ,.r_addr_i(rptr_r[0+:ptr_width_lp])
     ,.r_data_o(data_o)
     );
-
-// TODO: warn when dequeueing an empty FIFO
+  // synopsys translate_off
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(deq_v_i & empty)))
+    else begin $error("%m error: deque empty fifo at time %t", $time);
+      $finish;
+    end
+  // synopsys translate_on
 
 endmodule
 

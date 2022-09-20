@@ -3,8 +3,17 @@
 
 `default_nettype none
 
+/*
+ *   This random test checks:
+ * 1. if the data can go through the FIFO properly
+ * 2. good/incomplete/bad packet status
+ * 3. internal wptr, wcptr
+ *
+ */
+
 program testbench  #(parameter `BSG_INV_PARAM(width_p)
     , parameter `BSG_INV_PARAM(els_p)
+    , parameter `BSG_INV_PARAM(write_no_backpressure_p)
 )
 (
      input                      clk_i
@@ -27,6 +36,14 @@ program testbench  #(parameter `BSG_INV_PARAM(width_p)
 
 );
 
+
+localparam mtu_lp = els_p;
+localparam packet_count_lp = 1024;
+localparam buffer_size = packet_count_lp * mtu_lp;
+
+// data + last
+bit [width_p+1-1:0] buffer [buffer_size];
+
 clocking cb @(posedge clk_i);
   output data_o;
   output v_o;
@@ -45,31 +62,90 @@ clocking cb @(posedge clk_i);
 endclocking
 
 
-task automatic keep_sending_packet();
-  int i;
-  v_o = 1'b1;
-  forever begin
-    i = 0;
-    forever begin
-      data_o = 8'h11 * i;
-      if(i == 2)
-        last_o = 1'b1;
+task automatic send_and_check_packet(
+    input int els
+  , input int mtu
+  , input int count
+);
+  int unsigned data_seq = 0;
+  bit error_tmp;
+  int unsigned wcptr_tracker = 0;
+  for(int i = 0;i < count;) begin
+    error_tmp = $urandom() & 1'b1;
+    for(int j = 0;j < els;) begin
+      v_o = $urandom() & 1'b1;
+      if(v_o == 1'b1) begin
+        data_o = (width_p)'(data_seq * els + j);
+        last_o = (j == els - 1);
+        if(last_o == 1'b1) begin
+          error_o = error_tmp;
+        end
+      end
       @(cb);
       // check the sampled data
-      if(cb.ready_i == 1'b1) begin
+      if(cb.ready_i == 1'b1 & v_o == 1'b1) begin
         // handshaking completed
-        i++;
+        if(error_tmp == 1'b0) begin
+          buffer[i * els + j] = {data_o, last_o};
+        end
+        j++;
       end else begin
         // handshaking not completed
       end
-      if(i == 3) // finish sending all 3 data
-        break;
     end
-    last_o = 1'b0;
+
+    if(good_packet_i) begin
+      wcptr_tracker = (wcptr_tracker + els) % (2 * mtu);
+      i++;
+    end
+
+    // send complete
+    if(write_no_backpressure_p == 0) begin
+      if(error_tmp == 1'b0) begin
+        // good
+        assert(good_packet_i) else $finish;
+      end else begin
+        // bad
+        assert(bad_packet_i) else $finish;
+      end
+      // never incomplete
+      assert(incomplete_packet_i == 1'b0) else $finish;
+    end else begin
+      // one of them must be high
+      assert($onehot({good_packet_i, bad_packet_i, incomplete_packet_i})) else $finish;
+    end
+    // check wptr, wcptr
+    assert(wcptr_tracker == wrapper.dut.fifo.wcptr_r) else $finish;
+    assert(wrapper.dut.fifo.wcptr_r == wrapper.dut.fifo.wptr_r) else $finish;
+
+    data_seq++;
+
   end
   v_o = 1'b0;
 endtask
 
+task automatic receive_and_check_packet(
+    input int count
+);
+  int idx = 0;
+  // keep receiving until 'count' packets are received
+  for(int i = 0;i < count;i++) begin
+    forever begin
+      ready_o = $urandom() & 1'b1;
+      @(cb);
+      if(cb.v_i & ready_o) begin
+        // received a beat: check it
+        assert(idx < buffer_size) else $finish;
+        assert(buffer[idx++] == {cb.data_i, cb.last_i}) else $finish;
+        $display("%x %x", cb.data_i, cb.last_i);
+        if(cb.last_i == 1'b1)
+          break;
+      end
+    end
+  end
+endtask
+
+int valid_count;
 initial begin
   reset_o = 1'b1;
   v_o = 1'b0;
@@ -79,15 +155,10 @@ initial begin
   @(cb);
   reset_o = 1'b0;
   fork
-    keep_sending_packet();
-    begin
-      for(int i = 0;i < 32;i++) begin
-        ready_o = $urandom() & 1'b1;
-        @(cb);
-      end
-      $finish;
-    end
+    send_and_check_packet(mtu_lp - 1, mtu_lp, packet_count_lp);
+    receive_and_check_packet(packet_count_lp);
   join
+  $display("Test completed");
 end
 
 endprogram
@@ -95,6 +166,7 @@ endprogram
 
 module wrapper();
 
+// change parameters here:
 parameter width_p = 8;
 parameter els_p = 4;
 parameter write_no_backpressure_p = 0;
@@ -124,15 +196,12 @@ always #1 clk_i = ~clk_i;
 initial begin
     $vcdplusfile("dump.vpd");
     $vcdpluson();
-//    for(int i = 0;i < 64;i++)
-//      @(posedge clk_i);
-//    $display("Timeout");
-//    $finish;
 end
 
 testbench #(
      .width_p(width_p)
     ,.els_p(els_p)
+    ,.write_no_backpressure_p(write_no_backpressure_p)
 ) testbench (
      .clk_i(clk_i)
     ,.reset_o(reset_lo)

@@ -70,12 +70,14 @@ module bsg_fifo_1r1w_rolly_unhardened
 
   // one read pointer, one write pointer
   logic [ptr_width_lp-1:0] rptr_r, wptr_r;
+  // one read checkpoint pointer, one write checkpoint pointer
+  logic [ptr_width_lp-1:0] rcptr_r, wcptr_r;
   logic                    full, empty;
   // rptr_n is one cycle earlier than rptr_r
   logic [ptr_width_lp-1:0] rptr_n;
 
   wire enq      = ready_THEN_valid_p ? v_i : ready_o & v_i;
-  wire deq      = deq_v_i & ~empty;
+  wire deq      = deq_v_i & ~(rptr_r == rcptr_r);
   wire read     = yumi_i;
   wire rollback = rollback_v_i;
   wire ack      = ack_v_i;
@@ -102,6 +104,8 @@ module bsg_fifo_1r1w_rolly_unhardened
 
      ,.wptr_r_o(wptr_r)
      ,.rptr_r_o(rptr_r)
+     ,.wcptr_r_o(wcptr_r)
+     ,.rcptr_r_o(rcptr_r)
      ,.rptr_n_o(rptr_n)
      ,.full_o(full)
      ,.empty_o(empty)
@@ -121,12 +125,13 @@ module bsg_fifo_1r1w_rolly_unhardened
     );
 
   // synopsys translate_off
-  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(deq_v_i & empty)))
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(deq_v_i & (rptr_r == rcptr_r))))
     else $error("%m error: deque empty fifo at time %t", $time);
 
   assert property (@(posedge clk_i) (reset_i != 1'b0 ||
-        ($countones({deq_v_i, rollback_v_i, ack_v_i}) <= 1)))
-    else $error("%m error: request more than one read operations at time %t", $time);
+        (rollback_v_i && ack_v_i) || (deq_v_i && ack_v_i)))
+    else $error("%m error: invalid read operations at time %t", $time);
+
   // synopsys translate_on
 
 endmodule

@@ -20,6 +20,8 @@ module bsg_fifo_rolly_tracker
 
   , output [ptr_width_lp-1:0] wptr_r_o
   , output [ptr_width_lp-1:0] rptr_r_o
+  , output [ptr_width_lp-1:0] wcptr_r_o
+  , output [ptr_width_lp-1:0] rcptr_r_o
   , output [ptr_width_lp-1:0] rptr_n_o
 
   , output full_o
@@ -46,12 +48,14 @@ module bsg_fifo_rolly_tracker
                        : ((ptr_width_lp+1)'(enq_i));
 
   assign rcptr_jmp = ack_i
-                    ? (rptr_r - rcptr_r)
+                    // ack_i also acks the current read
+                    ? (rptr_r - rcptr_r + (ptr_width_lp+1)'(read_i))
                     : ((ptr_width_lp+1)'(deq_i));
 
   assign wcptr_jmp = clr_i
                     ? (rptr_r - wcptr_r + (ptr_width_lp+1)'(read_i))
                     : commit_i
+                       // commit_i also commits the current write
                        ? (wptr_r - wcptr_r) + (ptr_width_lp+1)'(enq_i)
                        : ((ptr_width_lp+1)'(0));
 
@@ -95,6 +99,18 @@ module bsg_fifo_rolly_tracker
     ,.n_o(rptr_n)
     );
 
+  //   full: rcptr == wptr
+  //   all transistions to above condition:
+  // 1. init
+  // 2. clr (X)
+  // 3. enq an element (O)
+  // 4. drop (X)
+  //   empty: rptr == wcptr
+  //   all transistions to above condition:
+  // 1. init
+  // 2. deq an element (O)
+  // 3. clr (O)
+  // 4. commit (X)
   assign full_o = (rcptr_r[0+:ptr_width_lp] == wptr_r[0+:ptr_width_lp])
               & (rcptr_r[ptr_width_lp] != wptr_r[ptr_width_lp]);
 
@@ -103,6 +119,9 @@ module bsg_fifo_rolly_tracker
 
   assign wptr_r_o = wptr_r[0+:ptr_width_lp];
   assign rptr_r_o = rptr_r[0+:ptr_width_lp];
+  assign wcptr_r_o = wcptr_r[0+:ptr_width_lp];
+  assign rcptr_r_o = rcptr_r[0+:ptr_width_lp];
+
   assign rptr_n_o = rptr_n[0+:ptr_width_lp];
 
   // synopsys translate_off

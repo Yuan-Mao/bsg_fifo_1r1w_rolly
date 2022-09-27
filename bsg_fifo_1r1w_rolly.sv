@@ -3,7 +3,7 @@
 `include "bsg_defines.v"
 
   // Operations
-  //   deq_v_i: Increment rcptr by 1
+  //   incr_v_i: Increment rcptr by 1
   //   rollback_v_i: Reset rptr to rcptr
   //   ack_v_i: Forward rcptr to rptr
   //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
@@ -26,7 +26,7 @@
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //          //          //          //          //          //          //          //          //
   //  rptr    //    -     //    -     //    -     //    -     //    -     // rollback // rollback //
-  //          //          //          //          //          //          //  (~deq)  //  (deq)   //
+  //          //          //          //          //          //          //  (~incr) //  (incr)  //
   //          //          //          //          //          //          //          //          //
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //          //          //          //          //          //          //          //          //
@@ -43,16 +43,15 @@
 
 module bsg_fifo_1r1w_rolly
   #(parameter `BSG_INV_PARAM(width_p)
-    , parameter `BSG_INV_PARAM(els_p)
+    , parameter `BSG_INV_PARAM(lg_size_p)
     , parameter ready_THEN_valid_p = 0
     , parameter harden_p = 0
-    , localparam ptr_width_lp = `BSG_SAFE_CLOG2(els_p)
     )
   (input                  clk_i
    , input                reset_i
 
    // read side
-   , input                deq_v_i
+   , input                incr_v_i
    , input                rollback_v_i
    , input                ack_v_i
 
@@ -73,7 +72,7 @@ module bsg_fifo_1r1w_rolly
   if (harden_p == 0)
     begin: unhardened
       bsg_fifo_1r1w_rolly_unhardened #(.width_p(width_p)
-                                      ,.els_p(els_p)
+                                      ,.lg_size_p(lg_size_p)
                                       ,.ready_THEN_valid_p(ready_THEN_valid_p)
                                       ) fifo
       (.*);
@@ -81,7 +80,7 @@ module bsg_fifo_1r1w_rolly
   else
     begin: hardened
       bsg_fifo_1r1w_rolly_hardened #(.width_p(width_p)
-                                    ,.els_p(els_p)
+                                    ,.lg_size_p(lg_size_p)
                                     ,.ready_THEN_valid_p(ready_THEN_valid_p)
                                     ) fifo
       (.*);

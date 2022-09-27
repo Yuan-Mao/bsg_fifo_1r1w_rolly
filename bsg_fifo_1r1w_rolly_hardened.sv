@@ -2,7 +2,7 @@
 `include "bsg_defines.v"
 
   // Operations
-  //   deq_v_i: Increment rcptr by 1
+  //   incr_v_i: Increment rcptr by 1
   //   rollback_v_i: Reset rptr to rcptr
   //   ack_v_i: Forward rcptr to rptr
   //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
@@ -20,17 +20,17 @@
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //          //          //          //          //          //          //          //          //
   //  wptr    //    -     //    -     //  clr     //  clr     //  drop    //    -     //    -     //
-  //          //          //          //  (~read) //  (read)  //          //          //          //
+  //          //          //          //  (~deq)  //  (deq)   //          //          //          //
   //          //          //          //          //          //          //          //          //
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //          //          //          //          //          //          //          //          //
   //  rptr    //    -     //    -     //    -     //    -     //    -     // rollback // rollback //
-  //          //          //          //          //          //          //  (~deq)  //  (deq)   //
+  //          //          //          //          //          //          //  (~incr) //  (incr)  //
   //          //          //          //          //          //          //          //          //
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //          //          //          //          //          //          //          //          //
   //  wcptr   //  commit  //  commit  //  clr     //  clr     //    -     //    -     //    -     //
-  //          //  (~enq)  //  (enq)   //  (~read) //  (read)  //          //          //          //
+  //          //  (~enq)  //  (enq)   //  (~deq)  //  (deq)   //          //          //          //
   //          //          //          //          //          //          //          //          //
   //////////////////////////////////////////////////////////////////////////////////////////////////
   //          //          //          //          //          //          //          //          //
@@ -42,15 +42,15 @@
 
 module bsg_fifo_1r1w_rolly_hardened
   #(parameter `BSG_INV_PARAM(width_p)
-    , parameter `BSG_INV_PARAM(els_p)
+    , parameter `BSG_INV_PARAM(lg_size_p)
     , parameter ready_THEN_valid_p = 0
-    , localparam ptr_width_lp = `BSG_SAFE_CLOG2(els_p)
+    , localparam els_lp = (1 << lg_size_p)
     )
   (input                  clk_i
    , input                reset_i
 
    // read side
-   , input                deq_v_i
+   , input                incr_v_i
    , input                rollback_v_i
    , input                ack_v_i
 
@@ -69,16 +69,16 @@ module bsg_fifo_1r1w_rolly_hardened
    );
 
   // one read pointer, one write pointer
-  logic [ptr_width_lp-1:0] rptr_r, wptr_r;
+  logic [lg_size_p-1:0] rptr_r, wptr_r;
   // one read checkpoint pointer, one write checkpoint pointer
-  logic [ptr_width_lp-1:0] rcptr_r, wcptr_r;
+  logic [lg_size_p-1:0] rcptr_r, wcptr_r;
   logic                    full, empty;
   // rptr_n is one cycle earlier than rptr_r
-  logic [ptr_width_lp-1:0] rptr_n;
+  logic [lg_size_p-1:0] rptr_n;
 
   wire enq      = ready_THEN_valid_p ? v_i : ready_o & v_i;
-  wire deq      = deq_v_i & ~(rptr_r == rcptr_r);
-  wire read     = yumi_i;
+  wire deq      = yumi_i;
+  wire incr     = incr_v_i & ~(rptr_r == rcptr_r);
   wire rollback = rollback_v_i;
   wire ack      = ack_v_i;
   wire clr      = clr_v_i;
@@ -89,13 +89,13 @@ module bsg_fifo_1r1w_rolly_hardened
   assign v_o     = ~rollback & ~empty;
 
   bsg_fifo_rolly_tracker
-   #(.els_p(els_p))
+   #(.lg_size_p(lg_size_p))
    ft
     (.clk_i(clk_i)
      ,.reset_i(reset_i)
      ,.enq_i(enq)
      ,.deq_i(deq)
-     ,.read_i(read)
+     ,.incr_i(incr)
      ,.rollback_i(rollback)
      ,.ack_i(ack)
      ,.clr_i(clr)
@@ -117,7 +117,7 @@ module bsg_fifo_1r1w_rolly_hardened
 
   bsg_mem_1r1w_sync
   #(.width_p(width_p)
-    ,.els_p(els_p)
+    ,.els_p(els_lp)
     ,.read_write_same_addr_p(0)
     ,.disable_collision_warning_p(0)
     ,.harden_p(1))
@@ -147,11 +147,11 @@ module bsg_fifo_1r1w_rolly_hardened
   assign data_o = (read_write_same_addr_r) ? data_o_reg : data_o_mem;
 
   // synopsys translate_off
-  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(deq_v_i & (rptr_r == rcptr_r))))
-    else $error("%m error: deque empty fifo at time %t", $time);
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(incr_v_i & (rptr_r == rcptr_r))))
+    else $error("%m error: invalid read increment operation at time %t", $time);
 
   assert property (@(posedge clk_i) (reset_i != 1'b0 ||
-        ~((rollback_v_i && ack_v_i) || (deq_v_i && ack_v_i))))
+        ~((rollback_v_i && ack_v_i) || (incr_v_i && ack_v_i))))
     else $error("%m error: invalid read operations at time %t", $time);
 
   // synopsys translate_on

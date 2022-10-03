@@ -10,7 +10,10 @@
 //  drop & commit
 // * rollback || empty -> !deq
 // * clr > drop, commit
+// * clr and drop will discard the current write if any
 
+//   TODO: Add comments for the round trip between
+// ready_o and commit_not_drop_v_i
 module bsg_fifo_rolly_tracker
   #(parameter `BSG_INV_PARAM(lg_size_p)
   , localparam els_lp = (1 << lg_size_p)

@@ -1,7 +1,9 @@
-.PHONY: all wave clean
+.PHONY: all wave cov clean
 
 export CUR_DIR := $(shell pwd)
 export BASEJUMP_STL_DIR := /mnt/users/ssd3/homes/ymchueh/tmp/basejump_stl
+export TESTBENCH_FILE := testbench_store_forward.sv
+export COV_FILE := bsg_store_forward_cov.sv
 
 
 TOP_MODULE := wrapper
@@ -21,7 +23,8 @@ all: flist.vcs
 	vcs $(VCS_OPTS)
 wave:
 	dve -full64 -vpd dump.vpd
-
+cov:
+	dve -full64 -cov -covdir simv.vdb
 flist.vcs: flist.template
 	cat $^ | envsubst > $@
 

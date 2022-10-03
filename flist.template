@@ -1,4 +1,6 @@
-$CUR_DIR/testbench.sv
+$CUR_DIR/wrapper.sv
+$CUR_DIR/$TESTBENCH_FILE
+$CUR_DIR/$COV_FILE
 $CUR_DIR/bsg_fifo_1r1w_rolly.sv
 $CUR_DIR/bsg_fifo_1r1w_rolly_hardened.sv
 $CUR_DIR/bsg_fifo_1r1w_rolly_unhardened.sv

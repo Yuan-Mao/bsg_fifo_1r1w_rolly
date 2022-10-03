@@ -72,13 +72,13 @@ module bsg_fifo_1r1w_rolly_hardened
   logic [lg_size_p-1:0] rptr_r, wptr_r;
   // one read checkpoint pointer, one write checkpoint pointer
   logic [lg_size_p-1:0] rcptr_r, wcptr_r;
-  logic                    full, empty;
+  logic                 full, empty;
   // rptr_n is one cycle earlier than rptr_r
   logic [lg_size_p-1:0] rptr_n;
 
   wire enq      = ready_THEN_valid_p ? v_i : ready_o & v_i;
   wire deq      = yumi_i;
-  wire incr     = incr_v_i & ~(rptr_r == rcptr_r);
+  wire incr     = incr_v_i;
   wire rollback = rollback_v_i;
   wire ack      = ack_v_i;
   wire clr      = clr_v_i;
@@ -147,7 +147,7 @@ module bsg_fifo_1r1w_rolly_hardened
   assign data_o = (read_write_same_addr_r) ? data_o_reg : data_o_mem;
 
   // synopsys translate_off
-  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(incr_v_i & (rptr_r == rcptr_r))))
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(incr_v_i & (rptr_n == rcptr_r))))
     else $error("%m error: invalid read increment operation at time %t", $time);
 
   assert property (@(posedge clk_i) (reset_i != 1'b0 ||

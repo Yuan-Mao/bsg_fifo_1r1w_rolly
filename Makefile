@@ -2,8 +2,8 @@
 
 export CUR_DIR := $(shell pwd)
 export BASEJUMP_STL_DIR := /mnt/users/ssd3/homes/ymchueh/tmp/basejump_stl
-export TESTBENCH_FILE := testbench_store_forward.sv
-export COV_FILE := bsg_store_forward_cov.sv
+export TESTBENCH_FILE := testbench_speculation.sv
+export COV_FILE := bsg_speculation_cov.sv
 
 
 TOP_MODULE := wrapper

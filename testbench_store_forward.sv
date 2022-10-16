@@ -147,6 +147,8 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
 
   int unsigned count;
   initial begin
+    // This testbench will break if FIFO is 1 element large.
+    assert(lg_size_p >= 1) else $finish;
     reset_o = 1'b1;
     v_o = 1'b0;
     ready_lo = 1'b0;

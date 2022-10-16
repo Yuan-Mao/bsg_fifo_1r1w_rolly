@@ -147,12 +147,13 @@ module bsg_fifo_1r1w_rolly_hardened
   assign data_o = (read_write_same_addr_r) ? data_o_reg : data_o_mem;
 
   // synopsys translate_off
-  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(incr_v_i & (rptr_n == rcptr_r))))
-    else $error("%m error: invalid read increment operation at time %t", $time);
 
+//  assert property (@(posedge clk_i) (reset_i != 1'b0 ||
+//        ~((rollback_v_i && ack_v_i) || (incr_v_i && ack_v_i))))
+//    else $error("%m error: invalid read operations at time %t", $time);
   assert property (@(posedge clk_i) (reset_i != 1'b0 ||
         ~((rollback_v_i && ack_v_i) || (incr_v_i && ack_v_i))))
-    else $error("%m error: invalid read operations at time %t", $time);
+    else $finish;
 
   // synopsys translate_on
 

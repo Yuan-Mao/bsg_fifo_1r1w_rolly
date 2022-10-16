@@ -125,9 +125,21 @@ module bsg_fifo_rolly_tracker
   assign rptr_n_o = rptr_n[0+:lg_size_p];
 
   // synopsys translate_off
+//  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(commit_i & drop_i)))
+//    else $error("%m error: request both commit and drop at time %t", $time);
+
   assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(commit_i & drop_i)))
-    else $error("%m error: request both commit and drop at time %t", $time);
+    else $finish;
   // synopsys translate_on
+
+  //   This avoids rcptr going past rptr which happens when
+  // 1. rollback is 0, rptr == rcptr, deq is 0 and incr is 1
+  // 2. rollback is 1, rptr == rcptr, deq is ~rollback and incr is 1
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(incr_i & (rptr_r == rcptr_r) &
+        deq_i == 1'b0)))
+    else $finish;
+//    else $error("%m error: invalid read increment operation at time %t", $time);
+
 
 endmodule
 

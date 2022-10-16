@@ -2,7 +2,7 @@
 module wrapper();
 
   // change parameters here:
-  parameter width_p = 8;
+  parameter width_p = 32;
   parameter lg_size_p = 2;
 
   bit                 clk_i;
@@ -28,8 +28,8 @@ module wrapper();
   always #1 clk_i = ~clk_i;
 
   initial begin
-      $vcdplusfile("dump.vpd");
-      $vcdpluson();
+//      $vcdplusfile("dump.vpd");
+//      $vcdpluson();
   end
 
   testbench #(
@@ -59,7 +59,6 @@ module wrapper();
   bsg_fifo_1r1w_rolly_hardened #(
      .width_p(width_p)
     ,.lg_size_p(lg_size_p)
-    ,.harden_p(1)
   ) dut (
      .clk_i(clk_i)
     ,.reset_i(reset_lo)

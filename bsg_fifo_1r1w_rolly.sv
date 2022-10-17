@@ -3,10 +3,10 @@
 `include "bsg_defines.v"
 
   // Operations
-  //   incr_v_i: Increment rcptr by 1
-  //   rollback_v_i: Reset rptr to rcptr
-  //   ack_v_i: Forward rcptr to rptr
-  //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
+  //   r_incr_i: Increment rcptr by 1
+  //   r_rewind_i: Reset rptr to rcptr
+  //   r_forward_i: Forward rcptr to rptr
+  //   w_clear_i: Move wptr, wcptr to rptr, i.e., clear all the data
   // between rptr and wptr
   //   commit: Forward wcptr to wptr
   //   drop: Reset wptr to wcptr
@@ -51,14 +51,16 @@ module bsg_fifo_1r1w_rolly
    , input                reset_i
 
    // read side
-   , input                incr_v_i
-   , input                rollback_v_i
-   , input                ack_v_i
+   , input                r_incr_i
+   , input                r_rewind_i
+   , input                r_forward_i
+   , input                r_clear_i
 
    // write side
-   , input                clr_v_i
-   , input                commit_not_drop_v_i
-   , input                commit_not_drop_i
+   , input                w_incr_i
+   , input                w_rewind_i
+   , input                w_forward_i
+   , input                w_clear_i
 
    , input [width_p-1:0]  data_i
    , input                v_i

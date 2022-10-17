@@ -2,10 +2,10 @@
 `include "bsg_defines.v"
 
   // Operations
-  //   incr_v_i: Increment rcptr by 1
-  //   rollback_v_i: Reset rptr to rcptr
-  //   ack_v_i: Forward rcptr to rptr
-  //   clr_v_i: Move wptr, wcptr to rptr, i.e., clear all the data
+  //   r_incr_i: Increment rcptr by 1
+  //   r_rewind_i: Reset rptr to rcptr
+  //   r_forward_i: Forward rcptr to rptr
+  //   w_clear_i: Move wptr, wcptr to rptr, i.e., clear all the data
   // between rptr and wptr
   //   commit: Forward wcptr to wptr
   //   drop: Reset wptr to wcptr
@@ -50,14 +50,16 @@ module bsg_fifo_1r1w_rolly_hardened
    , input                reset_i
 
    // read side
-   , input                incr_v_i
-   , input                rollback_v_i
-   , input                ack_v_i
+   , input                r_incr_i
+   , input                r_rewind_i
+   , input                r_forward_i
+   , input                r_clear_i // new
 
    // write side
-   , input                clr_v_i
-   , input                commit_not_drop_v_i
-   , input                commit_not_drop_i
+   , input                w_incr_i // new
+   , input                w_rewind_i
+   , input                w_forward_i
+   , input                w_clear_i
 
    , input [width_p-1:0]  data_i
    , input                v_i
@@ -76,17 +78,11 @@ module bsg_fifo_1r1w_rolly_hardened
   // rptr_n is one cycle earlier than rptr_r
   logic [lg_size_p-1:0] rptr_n;
 
-  wire enq      = ready_THEN_valid_p ? v_i : ready_o & v_i;
-  wire deq      = yumi_i;
-  wire incr     = incr_v_i;
-  wire rollback = rollback_v_i;
-  wire ack      = ack_v_i;
-  wire clr      = clr_v_i;
-  wire commit   = commit_not_drop_v_i & commit_not_drop_i;
-  wire drop     = commit_not_drop_v_i & ~commit_not_drop_i;
+  wire enq       = ready_THEN_valid_p ? v_i : ready_o & v_i;
+  wire deq       = yumi_i;
 
-  assign ready_o = ~clr & ~full;
-  assign v_o     = ~rollback & ~empty;
+  assign ready_o = ~w_clear_i & ~full;
+  assign v_o     = ~r_rewind_i & ~empty;
 
   bsg_fifo_rolly_tracker
    #(.lg_size_p(lg_size_p))
@@ -95,12 +91,6 @@ module bsg_fifo_1r1w_rolly_hardened
      ,.reset_i(reset_i)
      ,.enq_i(enq)
      ,.deq_i(deq)
-     ,.incr_i(incr)
-     ,.rollback_i(rollback)
-     ,.ack_i(ack)
-     ,.clr_i(clr)
-     ,.commit_i(commit)
-     ,.drop_i(drop)
 
      ,.wptr_r_o(wptr_r)
      ,.rptr_r_o(rptr_r)
@@ -110,6 +100,7 @@ module bsg_fifo_1r1w_rolly_hardened
      ,.rptr_n_o(rptr_n)
      ,.full_o(full)
      ,.empty_o(empty)
+     ,.*
      );
 
   logic [width_p-1:0] data_o_mem, data_o_reg;
@@ -149,10 +140,10 @@ module bsg_fifo_1r1w_rolly_hardened
   // synopsys translate_off
 
 //  assert property (@(posedge clk_i) (reset_i != 1'b0 ||
-//        ~((rollback_v_i && ack_v_i) || (incr_v_i && ack_v_i))))
+//        ~((r_rewind_i && r_forward_i) || (r_incr_i && r_forward_i))))
 //    else $error("%m error: invalid read operations at time %t", $time);
   assert property (@(posedge clk_i) (reset_i != 1'b0 ||
-        ~((rollback_v_i && ack_v_i) || (incr_v_i && ack_v_i))))
+        ~((r_rewind_i && r_forward_i) || (r_incr_i && r_forward_i))))
     else $finish;
 
   // synopsys translate_on

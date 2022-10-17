@@ -21,14 +21,19 @@ module bsg_fifo_rolly_tracker
   (input  clk_i
   , input reset_i
 
-  , input enq_i
-  , input incr_i
-  , input deq_i
-  , input rollback_i
-  , input ack_i
-  , input clr_i
-  , input commit_i
-  , input drop_i
+  // read side
+  , input                r_enq_i
+  , input                r_incr_i
+  , input                r_rewind_i
+  , input                r_forward_i
+  , input                r_clear_i // new
+
+  // write side
+  , input                w_deq_i
+  , input                w_incr_i // new
+  , input                w_rewind_i
+  , input                w_forward_i
+  , input                w_clear_i
 
   , output [lg_size_p-1:0] wptr_r_o
   , output [lg_size_p-1:0] rptr_r_o
@@ -49,27 +54,31 @@ module bsg_fifo_rolly_tracker
   // Used to catch up on various read/write operations
   logic [lg_size_p:0] rptr_jmp, rcptr_jmp, wptr_jmp, wcptr_jmp;
 
-  assign rptr_jmp = rollback_i
-                    ? (rcptr_r - rptr_r + (lg_size_p+1)'(incr_i))
-                    : ((lg_size_p+1)'(deq_i));
+  assign rptr_jmp  = r_clear_i
+                     ? (wcptr_r - rptr_r + (lg_size_p+1)'(w_incr_i))
+                     : r_rewind_i
+                       ? (rcptr_r - rptr_r + (lg_size_p+1)'(r_incr_i))
+                       : ((lg_size_p+1)'(w_deq_i));
 
-  assign wptr_jmp = clr_i
-                    ? (rptr_r - wptr_r + (lg_size_p+1)'(deq_i))
-                    : drop_i
-                       ? (wcptr_r - wptr_r)
-                       : ((lg_size_p+1)'(enq_i));
+  assign wptr_jmp  = w_clear_i
+                     ? (rptr_r - wptr_r + (lg_size_p+1)'(w_deq_i))
+                     : w_rewind_i
+                       ? (wcptr_r - wptr_r + (lg_size_p+1)'(w_incr_i))
+                       : ((lg_size_p+1)'(r_enq_i));
 
-  assign rcptr_jmp = ack_i
-                    // ack_i also acks the current read
-                    ? (rptr_r - rcptr_r + (lg_size_p+1)'(deq_i))
-                    : ((lg_size_p+1)'(incr_i));
+  assign rcptr_jmp = r_clear_i
+                     ? (wcptr_r - rcptr_r + (lg_size_p+1)'(w_incr_i))
+                     : r_forward_i
+                       // r_forward_i also acks the current read
+                       ? (rptr_r - rcptr_r + (lg_size_p+1)'(w_deq_i))
+                       : ((lg_size_p+1)'(r_incr_i));
 
-  assign wcptr_jmp = clr_i
-                    ? (rptr_r - wcptr_r + (lg_size_p+1)'(deq_i))
-                    : commit_i
-                       // commit_i also commits the current write
-                       ? (wptr_r - wcptr_r) + (lg_size_p+1)'(enq_i)
-                       : ((lg_size_p+1)'(0));
+  assign wcptr_jmp = w_clear_i
+                     ? (rptr_r - wcptr_r + (lg_size_p+1)'(w_deq_i))
+                     : w_forward_i
+                       // w_forward_i also commits the current write
+                       ? (wptr_r - wcptr_r) + (lg_size_p+1)'(r_enq_i)
+                       : ((lg_size_p+1)'(w_incr_i));
 
   bsg_circular_ptr
    #(.slots_p(2*els_lp), .max_add_p(2*els_lp-1))
@@ -125,21 +134,17 @@ module bsg_fifo_rolly_tracker
   assign rptr_n_o = rptr_n[0+:lg_size_p];
 
   // synopsys translate_off
-//  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(commit_i & drop_i)))
-//    else $error("%m error: request both commit and drop at time %t", $time);
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(w_forward_i & w_rewind_i)))
+    else begin $error("%m error: request both commit and drop at time %t", $time); $finish; end
 
-  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(commit_i & drop_i)))
-    else $finish;
   // synopsys translate_on
 
   //   This avoids rcptr going past rptr which happens when
   // 1. rollback is 0, rptr == rcptr, deq is 0 and incr is 1
   // 2. rollback is 1, rptr == rcptr, deq is ~rollback and incr is 1
-  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(incr_i & (rptr_r == rcptr_r) &
-        deq_i == 1'b0)))
-    else $finish;
-//    else $error("%m error: invalid read increment operation at time %t", $time);
-
+  assert property (@(posedge clk_i) (reset_i != 1'b0 || ~(r_incr_i & (rptr_r == rcptr_r) &
+        w_deq_i == 1'b0)))
+    else begin $error("%m error: invalid read increment operation at time %t", $time); $finish; end
 
 endmodule
 

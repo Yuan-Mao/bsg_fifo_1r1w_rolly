@@ -1,5 +1,4 @@
 
-
 `include "bsg_defines.v"
 
 module bsg_fifo_1r1w_rolly

@@ -1,6 +1,4 @@
 
-`default_nettype none
-
 `include "bsg_defines.v"
 
 module bsg_fifo_1r1w_store_and_forward

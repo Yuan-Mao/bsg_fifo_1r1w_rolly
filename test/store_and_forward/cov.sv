@@ -151,17 +151,6 @@ program cov
          // yumi == 1'b0 when empty
          ((cp_rptr == cp_wcptr) && cp_yumi));
       illegal_bins bins_3 = cross_all with (
-         // TODO: Remove this illegal bins
-         // when overflow, cp_v shouldn't be 1; otherwise the module will get stuck
-         (((cp_wcptr % ('b1 << lg_size_p)) == (cp_wptr % ('b1 << lg_size_p)))
-           & (cp_wcptr >> lg_size_p) != (cp_wptr >> lg_size_p)) && cp_v);
-     illegal_bins bins_4 = cross_all with (
-         // TODO: Remove this illegal bins
-         // for this use case, full -> ~ready_o -> ~(v_i & (w_forward_i | w_rewind_i))
-         (((cp_rcptr % ('b1 << lg_size_p)) == (cp_wptr % ('b1 << lg_size_p)))
-           & (cp_rcptr >> lg_size_p) != (cp_wptr >> lg_size_p)) && cp_v && (cp_w_forward ||
-              cp_w_rewind));
-    illegal_bins bins_5 = cross_all with (
          // cannot do forward and rewind at the same time
          (cp_w_forward && cp_w_rewind));
 
@@ -170,6 +159,15 @@ program cov
 
   // create cover groups
   cg cg_inst = new;
+
+  initial begin
+    forever begin
+      for(int i = 0;i < 100000;i++) begin
+        @(cb);
+      end
+      $display("Functional coverage is %f%%", cg_inst.cross_all.get_coverage());
+    end
+  end
 
   // print coverages when simulation is done
   final begin

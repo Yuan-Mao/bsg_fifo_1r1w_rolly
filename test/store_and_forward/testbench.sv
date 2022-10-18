@@ -24,14 +24,14 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
 );
 
   // total packet count
-  parameter packet_count_p = 16384;
+  parameter packet_count_p = 32768;
 
   logic ready_lo;
   assign yumi_o = v_i & ready_lo;
 
   localparam mtu_lp = els_lp;
   //   As long as the buffer size is large enough to track all the written data in DUT,
-  // any size will work
+  // any size would work
   localparam buffer_size = 2 * els_lp;
 
   bit [width_p-1:0] buffer [buffer_size];
@@ -48,7 +48,7 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
   );
     int unsigned packet_size;
     bit commit;
-    bit last_sent;
+    bit commit_drop_sent;
     bit handshaking_next;
     for(int unsigned idx = 0;idx < count;) begin
       // Get random size
@@ -61,10 +61,12 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
       if(packet_size == 0) begin
         commit_v_o = $urandom();
         commit_drop_o = $urandom();
+        v_o = (ready_i == 1'b0) ? $urandom() : 1'b0;
+        @(cb);
       end else begin
         // determine whether we want to commit or drop the next packet
         commit = $urandom();
-        last_sent = 1'b0;
+        commit_drop_sent = 1'b0;
         for(int j = 0;j < packet_size;) begin
           v_o = $urandom();
           if(v_o == 1'b1) begin
@@ -72,11 +74,11 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
 
             handshaking_next = v_o & ready_i;
             commit_v_o = (j == packet_size - 1) & ($urandom() % 2) & handshaking_next;
-            assert(last_sent == 1'b0) else $finish;
+            assert(commit_drop_sent == 1'b0) else $finish;
             if(commit_v_o == 1'b1) begin
               commit_drop_o = commit;
 //              $display("here: %0x %0x at %t", v_o, ready_i, $time);
-              last_sent = 1'b1;
+              commit_drop_sent = 1'b1;
             end else begin
               // check if the valid signal really guards the control
               commit_drop_o = $urandom();
@@ -97,15 +99,16 @@ program testbench #(parameter `BSG_INV_PARAM(width_p)
             // handshaking not completed
           end
         end
-        while(last_sent == 1'b0) begin
+        while(commit_drop_sent == 1'b0) begin
           commit_v_o = $urandom();
           commit_drop_o = commit;
+          v_o = (ready_i == 1'b0) ? $urandom() : 1'b0;
           @(cb);
           if(commit_v_o) begin
-            last_sent = 1'b1;
+            commit_drop_sent = 1'b1;
           end
         end
-//        $display("last_sent at time %t", $time);
+//        $display("commit_drop_sent at time %t", $time);
         if(commit == 1'b1) begin
           idx += packet_size;
         end

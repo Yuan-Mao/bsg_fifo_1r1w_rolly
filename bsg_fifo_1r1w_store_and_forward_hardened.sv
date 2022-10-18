@@ -3,7 +3,7 @@
 
 `include "bsg_defines.v"
 
-module bsg_fifo_1r1w_rolly_hardened
+module bsg_fifo_1r1w_store_and_forward_hardened
   #(parameter `BSG_INV_PARAM(width_p)
     , parameter `BSG_INV_PARAM(lg_size_p)
     , parameter ready_THEN_valid_p = 0
@@ -12,9 +12,8 @@ module bsg_fifo_1r1w_rolly_hardened
   (input                  clk_i
    , input                reset_i
 
-   , input                clr_v_i
-   , input                deq_v_i
-   , input                roll_v_i
+   , input                commit_v_i
+   , input                commit_drop_i
 
    , input [width_p-1:0]  data_i
    , input                v_i
@@ -31,16 +30,16 @@ module bsg_fifo_1r1w_rolly_hardened
   logic [lg_size_p-1:0] rptr_n;
 
   wire r_deq       = yumi_i;
-  wire r_incr      = deq_v_i;
-  wire r_rewind    = roll_v_i;
-  wire r_forward   = 1'b0; // unused
+  wire r_incr      = 1'b0;
+  wire r_rewind    = 1'b0; // unused
+  wire r_forward   = 1'b1; // ...so that rptr always == rcptr
   wire r_clear     = 1'b0; // unused
 
   wire w_enq       = ready_THEN_valid_p ? v_i : ready_o & v_i;
   wire w_incr      = 1'b0; // unused
-  wire w_rewind    = 1'b0; // unused
-  wire w_forward   = 1'b1; // ...so that wptr always == wcptr
-  wire w_clear     = clr_v_i;
+  wire w_rewind    = commit_v_i & ~commit_drop_i; // drop
+  wire w_forward   = commit_v_i &  commit_drop_i; // commit
+  wire w_clear     = 1'b0; // unused
 
 
   assign ready_o = ~w_clear & ~full;
@@ -114,5 +113,5 @@ module bsg_fifo_1r1w_rolly_hardened
 
 endmodule
 
-`BSG_ABSTRACT_MODULE(bsg_fifo_1r1w_rolly_hardened)
+`BSG_ABSTRACT_MODULE(bsg_fifo_1r1w_store_and_forward_hardened)
 

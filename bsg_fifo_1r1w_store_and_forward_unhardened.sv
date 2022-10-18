@@ -3,7 +3,7 @@
 
 `include "bsg_defines.v"
 
-module bsg_fifo_1r1w_rolly_hardened
+module bsg_fifo_1r1w_store_and_forward_unhardened
   #(parameter `BSG_INV_PARAM(width_p)
     , parameter `BSG_INV_PARAM(lg_size_p)
     , parameter ready_THEN_valid_p = 0
@@ -12,9 +12,8 @@ module bsg_fifo_1r1w_rolly_hardened
   (input                  clk_i
    , input                reset_i
 
-   , input                clr_v_i
-   , input                deq_v_i
-   , input                roll_v_i
+   , input                commit_v_i
+   , input                commit_drop_i
 
    , input [width_p-1:0]  data_i
    , input                v_i
@@ -25,22 +24,22 @@ module bsg_fifo_1r1w_rolly_hardened
    , input                yumi_i
    );
 
-  logic [lg_size_p-1:0] wptr_r;
+  logic [lg_size_p-1:0] wptr_r, rptr_r;
   logic                 full, empty;
   // rptr_n is one cycle earlier than rptr_r
   logic [lg_size_p-1:0] rptr_n;
 
   wire r_deq       = yumi_i;
-  wire r_incr      = deq_v_i;
-  wire r_rewind    = roll_v_i;
-  wire r_forward   = 1'b0; // unused
+  wire r_incr      = 1'b0;
+  wire r_rewind    = 1'b0; // unused
+  wire r_forward   = 1'b1; // ...so that rptr always == rcptr
   wire r_clear     = 1'b0; // unused
 
   wire w_enq       = ready_THEN_valid_p ? v_i : ready_o & v_i;
   wire w_incr      = 1'b0; // unused
-  wire w_rewind    = 1'b0; // unused
-  wire w_forward   = 1'b1; // ...so that wptr always == wcptr
-  wire w_clear     = clr_v_i;
+  wire w_rewind    = commit_v_i & ~commit_drop_i; // drop
+  wire w_forward   = commit_v_i &  commit_drop_i; // commit
+  wire w_clear     = 1'b0; // unused
 
 
   assign ready_o = ~w_clear & ~full;
@@ -65,7 +64,7 @@ module bsg_fifo_1r1w_rolly_hardened
      ,.w_clear_i(w_clear)
 
      ,.wptr_r_o(wptr_r)
-     ,.rptr_r_o()
+     ,.rptr_r_o(rptr_r)
      ,.wcptr_r_o()
      ,.rcptr_r_o()
 
@@ -78,41 +77,20 @@ module bsg_fifo_1r1w_rolly_hardened
      ,.empty_o(empty)
      );
 
-  logic [width_p-1:0] data_o_mem, data_o_reg;
-  logic read_write_same_addr_r, read_write_same_addr_n;
-
-  bsg_mem_1r1w_sync
-  #(.width_p(width_p)
-    ,.els_p(els_lp)
-    ,.read_write_same_addr_p(0)
-    ,.disable_collision_warning_p(0)
-    ,.harden_p(1))
+  bsg_mem_1r1w
+  #(.width_p(width_p), .els_p(els_lp))
   fifo_mem
-   (.clk_i(clk_i)
-    ,.reset_i(reset_i)
+   (.w_clk_i(clk_i)
+    ,.w_reset_i(reset_i)
     ,.w_v_i(w_enq)
     ,.w_addr_i(wptr_r)
     ,.w_data_i(data_i)
-    ,.r_v_i(~read_write_same_addr_n)
-    ,.r_addr_i(rptr_n)
-    ,.r_data_o(data_o_mem)
+    ,.r_v_i(r_deq)
+    ,.r_addr_i(rptr_r)
+    ,.r_data_o(data_o)
     );
-
-  bsg_dff_en
-  #(.width_p(width_p))
-  bypass_reg
-   (.clk_i(clk_i)
-    ,.data_i(data_i)
-    ,.en_i  (read_write_same_addr_n)
-    ,.data_o(data_o_reg)
-    );
-
-  assign read_write_same_addr_n = w_enq & (wptr_r == rptr_n);
-  always_ff @(posedge clk_i)
-    read_write_same_addr_r <= read_write_same_addr_n;
-  assign data_o = (read_write_same_addr_r) ? data_o_reg : data_o_mem;
 
 endmodule
 
-`BSG_ABSTRACT_MODULE(bsg_fifo_1r1w_rolly_hardened)
+`BSG_ABSTRACT_MODULE(bsg_fifo_1r1w_store_and_forward_unhardened)
 
